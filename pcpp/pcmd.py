@@ -51,6 +51,13 @@ class CmdPreprocessor(Preprocessor):
         argp.add_argument('--filetimes', dest = 'filetimes', metavar = 'path', type = argparse.FileType('wt'), default=None, nargs = '?', help = 'Write CSV file with time spent inside each included file, inclusive and exclusive')
         argp.add_argument('--compress', dest = 'compress', action = 'store_true', help = 'Make output as small as possible')
         argp.add_argument('--version', action='version', version='pcpp ' + version)
+        argp.add_argument('-Wundef', dest = 'warn_undefined', action = 'store_true', help = 'Warn when undefined macros are expanded')
+        argp.add_argument('-Wno-undef', dest = 'warn_undefined', action = 'store_false', help = 'Don''t warn when undefined macros are expanded')
+        argp.add_argument('-Werror=undef', dest = 'error_undefined', default = None, action = 'store_true', help = 'Error when undefined macros are expanded')
+        argp.add_argument('-Wno-error=undef', dest = 'error_undefined', action = 'store_false', help = 'Don''t error when undefined macros are expanded')
+        argp.add_argument('-Werror', dest = 'warn_error', action = 'store_true', help = 'Warnings treated as errors')
+        argp.add_argument('-Wno-error', dest = 'warn_error', action = 'store_false', help = 'Warnings not treated as errors')
+
         args = argp.parse_known_args(argv[1:])
         #print(args)
         for arg in args[1]:
@@ -171,6 +178,13 @@ class CmdPreprocessor(Preprocessor):
         return super(CmdPreprocessor, self).on_unknown_macro_in_defined_expr(tok)
         
     def on_unknown_macro_in_expr(self,tok):
+        # -Wno-error=undef overrides "-Werror -Wundef"
+        if ((self.args.error_undefined is None and self.args.warn_undefined and self.args.warn_error)
+            or self.args.error_undefined):
+            self.on_error(tok.source, tok.lineno, '"{tok.value}" is not defined, evaluates to 0 [-Werror=undef]'.format(tok=tok))
+        elif self.args.warn_undefined:
+            print('{tok.source}:{tok.lineno}: warning: "{tok.value}" is not defined, evaluates to 0 [-Wundef]'.format(tok=tok), file = sys.stderr)
+
         if self.args.undefines:
             if tok.value in self.args.undefines:
                 return super(CmdPreprocessor, self).on_unknown_macro_in_expr(tok)
