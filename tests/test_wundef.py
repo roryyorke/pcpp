@@ -146,5 +146,44 @@ int a;
         self.assertNotIn(self.ERROR_MESSAGE, stderr)
 
 
+class NowarnDefininitionTest(unittest.TestCase):
+
+    # bytes for NamedTemporaryFile
+    TEST_DATA = b"""#if defined(FOO) && FOO == 0
+int a;
+#endif
+"""
+
+    def run_test_case(self, args):
+        """Run test case with given args
+        Returns return_code, and stderr as string"""
+
+        infile = tempfile.NamedTemporaryFile(delete=False)
+        try:
+            infile.write(self.TEST_DATA)
+            infile.close()
+
+            if sys.version_info[0] < 3:
+                stderr = io.BytesIO()
+            else:
+                stderr = io.StringIO()
+
+            with redirect_stderr(stderr):
+                pcmd = CmdPreprocessor(["pcpp"] + args + [infile.name])
+
+            return pcmd.return_code, stderr.getvalue()
+
+        finally:
+            os.remove(infile.name)
+
+    def test_Wundef(self):
+        """Don't warn on defined(UNDEF_MACRO) and -Wundef given"""
+        return_code, stderr = self.run_test_case(["-Wundef"])
+        print(stderr)
+        self.assertEqual(return_code, 0)
+        self.assertNotIn('warning:', stderr)
+        self.assertNotIn('error:', stderr)
+
+
 if __name__ == "__main__":
     unittest.main()
